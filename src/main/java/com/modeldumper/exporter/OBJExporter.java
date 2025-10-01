@@ -17,8 +17,10 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class OBJExporter {
 
@@ -126,56 +128,123 @@ public class OBJExporter {
     }
 
     private static void extractModelPart(ModelPart part, PoseStack poseStack, List<Vertex> vertices) {
-        poseStack.pushPose();
+        try {
+            poseStack.pushPose();
 
-        // Apply part transformations
-        poseStack.translate(part.x / 16.0f, part.y / 16.0f, part.z / 16.0f);
-        poseStack.mulPose(new org.joml.Quaternionf().rotationXYZ(part.xRot, part.yRot, part.zRot));
+            // Apply part transformations
+            poseStack.translate(part.x / 16.0f, part.y / 16.0f, part.z / 16.0f);
+            poseStack.mulPose(new org.joml.Quaternionf().rotationXYZ(part.xRot, part.yRot, part.zRot));
 
-        // Extract cubes
-        for (ModelPart.Cube cube : part.cubes) {
-            extractCube(cube, poseStack, vertices);
+            // Use reflection to access private fields
+            Field cubesField = ModelPart.class.getDeclaredField("cubes");
+            cubesField.setAccessible(true);
+            List<?> cubes = (List<?>) cubesField.get(part);
+
+            // Extract cubes using reflection
+            for (Object cube : cubes) {
+                extractCubeReflection(cube, poseStack, vertices);
+            }
+
+            // Access children field using reflection
+            Field childrenField = ModelPart.class.getDeclaredField("children");
+            childrenField.setAccessible(true);
+            Map<String, ModelPart> children = (Map<String, ModelPart>) childrenField.get(part);
+
+            // Recursively extract children
+            for (ModelPart child : children.values()) {
+                extractModelPart(child, poseStack, vertices);
+            }
+
+            poseStack.popPose();
+        } catch (Exception e) {
+            ModelDumper.LOGGER.error("Error extracting model part", e);
         }
-
-        // Recursively extract children
-        for (ModelPart child : part.children.values()) {
-            extractModelPart(child, poseStack, vertices);
-        }
-
-        poseStack.popPose();
     }
 
-    private static void extractCube(ModelPart.Cube cube, PoseStack poseStack, List<Vertex> vertices) {
-        Matrix4f pose = poseStack.last().pose();
-        Matrix3f normal = poseStack.last().normal();
+    private static void extractCubeReflection(Object cube, PoseStack poseStack, List<Vertex> vertices) {
+        try {
+            Matrix4f pose = poseStack.last().pose();
+            Matrix3f normal = poseStack.last().normal();
 
-        for (ModelPart.Polygon polygon : cube.polygons) {
-            ModelPart.Vertex[] polyVerts = polygon.vertices;
+            // Get Cube class
+            Class<?> cubeClass = cube.getClass();
+
+            // Access polygons field
+            Field polygonsField = cubeClass.getDeclaredField("polygons");
+            polygonsField.setAccessible(true);
+            Object[] polygons = (Object[]) polygonsField.get(cube);
+
+            for (Object polygon : polygons) {
+                extractPolygonReflection(polygon, pose, normal, vertices);
+            }
+        } catch (Exception e) {
+            ModelDumper.LOGGER.error("Error extracting cube", e);
+        }
+    }
+
+    private static void extractPolygonReflection(Object polygon, Matrix4f pose, Matrix3f normal, List<Vertex> vertices) {
+        try {
+            // Get Polygon class
+            Class<?> polygonClass = polygon.getClass();
+
+            // Access vertices field
+            Field verticesField = polygonClass.getDeclaredField("vertices");
+            verticesField.setAccessible(true);
+            Object[] polyVerts = (Object[]) verticesField.get(polygon);
 
             // Convert quads to triangles
             if (polyVerts.length >= 3) {
                 for (int i = 1; i < polyVerts.length - 1; i++) {
-                    addVertex(polyVerts[0], pose, normal, vertices);
-                    addVertex(polyVerts[i], pose, normal, vertices);
-                    addVertex(polyVerts[i + 1], pose, normal, vertices);
+                    addVertexReflection(polyVerts[0], pose, normal, vertices);
+                    addVertexReflection(polyVerts[i], pose, normal, vertices);
+                    addVertexReflection(polyVerts[i + 1], pose, normal, vertices);
                 }
             }
+        } catch (Exception e) {
+            ModelDumper.LOGGER.error("Error extracting polygon", e);
         }
     }
 
-    private static void addVertex(ModelPart.Vertex vertex, Matrix4f pose, Matrix3f normal, List<Vertex> vertices) {
-        Vector4f pos = new Vector4f(vertex.pos.x() / 16.0f, vertex.pos.y() / 16.0f, vertex.pos.z() / 16.0f, 1.0f);
-        pos = pose.transform(pos);
+    private static void addVertexReflection(Object vertex, Matrix4f pose, Matrix3f normal, List<Vertex> vertices) {
+        try {
+            // Get Vertex class
+            Class<?> vertexClass = vertex.getClass();
 
-        Vector3f norm = new Vector3f(vertex.normal.x(), vertex.normal.y(), vertex.normal.z());
-        norm = normal.transform(norm);
+            // Access pos field
+            Field posField = vertexClass.getField("pos");
+            Vector3f pos = (Vector3f) posField.get(vertex);
 
-        Vertex v = new Vertex(
-            pos.x, pos.y, pos.z,
-            vertex.u, vertex.v,
-            norm.x, norm.y, norm.z
-        );
-        vertices.add(v);
+            // Access u and v fields
+            Field uField = vertexClass.getField("u");
+            Field vField = vertexClass.getField("v");
+            float u = uField.getFloat(vertex);
+            float v = vField.getFloat(vertex);
+
+            // Access normal field (if it exists)
+            Vector3f vertNormal = new Vector3f(0, 1, 0); // Default normal
+            try {
+                Field normalField = vertexClass.getField("normal");
+                vertNormal = (Vector3f) normalField.get(vertex);
+            } catch (NoSuchFieldException e) {
+                // Some vertices might not have normals
+            }
+
+            // Transform position
+            Vector4f transformedPos = new Vector4f(pos.x() / 16.0f, pos.y() / 16.0f, pos.z() / 16.0f, 1.0f);
+            transformedPos = pose.transform(transformedPos);
+
+            // Transform normal
+            Vector3f transformedNormal = normal.transform(vertNormal);
+
+            Vertex vert = new Vertex(
+                transformedPos.x, transformedPos.y, transformedPos.z,
+                u, v,
+                transformedNormal.x, transformedNormal.y, transformedNormal.z
+            );
+            vertices.add(vert);
+        } catch (Exception e) {
+            ModelDumper.LOGGER.error("Error adding vertex", e);
+        }
     }
 
     public static void exportItemModel(ModelData modelData, File outputFile, File mtlFile) {
@@ -330,6 +399,16 @@ public class OBJExporter {
         @Override
         public void endVertex() {
             vertices.add(new Vertex(x, y, z, u, v, nx, ny, nz));
+        }
+
+        @Override
+        public void unsetDefaultColor() {
+            // No-op implementation - not needed for our use case
+        }
+
+        @Override
+        public void defaultColor(int r, int g, int b, int a) {
+            // No-op implementation - not needed for our use case
         }
     }
 }
