@@ -37,6 +37,11 @@ public class ItemModelScanner {
                     ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(item);
                     String itemName = itemId.toString();
 
+                    // Skip vanilla Minecraft items
+                    if (itemId.getNamespace().equals("minecraft")) {
+                        continue;
+                    }
+
                     ItemStack stack = new ItemStack(item);
                     BakedModel bakedModel = minecraft.getItemRenderer().getModel(stack, null, null, 0);
 
@@ -65,7 +70,11 @@ public class ItemModelScanner {
                 }
             }
 
-            ModelDumper.LOGGER.info("Found {} item models", models.size());
+            if (models.isEmpty()) {
+                ModelDumper.LOGGER.info("No modded item models found");
+            } else {
+                ModelDumper.LOGGER.info("Found {} modded item models", models.size());
+            }
         } catch (Exception e) {
             ModelDumper.LOGGER.error("Error scanning item models", e);
         }

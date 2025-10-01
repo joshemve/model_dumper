@@ -35,6 +35,11 @@ public class ArmorModelScanner {
                         ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(item);
                         String itemName = itemId.toString();
 
+                        // Skip vanilla Minecraft armor
+                        if (itemId.getNamespace().equals("minecraft")) {
+                            continue;
+                        }
+
                         ModelData modelData = new ModelData();
                         modelData.name = itemName.replace(":", "_");
                         modelData.type = ModelData.ModelType.ARMOR;
@@ -65,7 +70,11 @@ public class ArmorModelScanner {
                 }
             }
 
-            ModelDumper.LOGGER.info("Found {} armor models", models.size());
+            if (models.isEmpty()) {
+                ModelDumper.LOGGER.info("No modded armor models found");
+            } else {
+                ModelDumper.LOGGER.info("Found {} modded armor models", models.size());
+            }
         } catch (Exception e) {
             ModelDumper.LOGGER.error("Error scanning armor models", e);
         }

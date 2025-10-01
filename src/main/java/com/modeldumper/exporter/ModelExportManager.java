@@ -17,26 +17,32 @@ public class ModelExportManager {
     private static final String EXPORT_ROOT = "model_dumps";
 
     public static void exportAllModels(boolean isClient) {
-        ModelDumper.LOGGER.info("=== Starting Model Dump ===");
+        ModelDumper.LOGGER.info("=== Starting Model Dump (Modded Content Only) ===");
         ModelDumper.LOGGER.info("Client: " + isClient);
+
+        // Scan all models
+        List<ModelData> allModels = new ArrayList<>();
+
+        ModelDumper.LOGGER.info("Scanning modded entities...");
+        allModels.addAll(EntityModelScanner.scanEntityModels(isClient));
+
+        ModelDumper.LOGGER.info("Scanning modded items...");
+        allModels.addAll(ItemModelScanner.scanItemModels(isClient));
+
+        ModelDumper.LOGGER.info("Scanning modded armor...");
+        allModels.addAll(ArmorModelScanner.scanArmorModels(isClient));
+
+        if (allModels.isEmpty()) {
+            ModelDumper.LOGGER.info("=== No Modded Content Found ===");
+            ModelDumper.LOGGER.info("No models to export. Install mods to export their models.");
+            return;
+        }
 
         // Create export directory structure
         File exportRoot = new File(EXPORT_ROOT);
         exportRoot.mkdirs();
 
-        // Scan all models
-        List<ModelData> allModels = new ArrayList<>();
-
-        ModelDumper.LOGGER.info("Scanning entities...");
-        allModels.addAll(EntityModelScanner.scanEntityModels(isClient));
-
-        ModelDumper.LOGGER.info("Scanning items...");
-        allModels.addAll(ItemModelScanner.scanItemModels(isClient));
-
-        ModelDumper.LOGGER.info("Scanning armor...");
-        allModels.addAll(ArmorModelScanner.scanArmorModels(isClient));
-
-        ModelDumper.LOGGER.info("Total models found: " + allModels.size());
+        ModelDumper.LOGGER.info("Total modded models found: " + allModels.size());
 
         // Export each model
         int exported = 0;
@@ -50,7 +56,7 @@ public class ModelExportManager {
         }
 
         ModelDumper.LOGGER.info("=== Model Dump Complete ===");
-        ModelDumper.LOGGER.info("Exported: " + exported + " / " + allModels.size() + " models");
+        ModelDumper.LOGGER.info("Exported: " + exported + " / " + allModels.size() + " modded models");
         ModelDumper.LOGGER.info("Location: " + exportRoot.getAbsolutePath());
     }
 

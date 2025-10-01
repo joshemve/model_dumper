@@ -9,6 +9,7 @@ import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -35,11 +36,17 @@ public class EntityModelScanner {
 
             for (EntityType<?> entityType : ForgeRegistries.ENTITY_TYPES.getValues()) {
                 try {
-                    String entityName = ForgeRegistries.ENTITY_TYPES.getKey(entityType).toString();
-                    
+                    ResourceLocation entityId = ForgeRegistries.ENTITY_TYPES.getKey(entityType);
+                    String entityName = entityId.toString();
+
+                    // Skip vanilla Minecraft entities
+                    if (entityId.getNamespace().equals("minecraft")) {
+                        continue;
+                    }
+
                     // Get renderer directly from the entity type without creating an entity instance
                     EntityRenderer<?> renderer = entityRenderDispatcher.renderers.get(entityType);
-                    
+
                     if (renderer == null) {
                         continue;
                     }
@@ -51,7 +58,7 @@ public class EntityModelScanner {
                         modelData.name = entityName.replace(":", "_");
                         modelData.type = ModelData.ModelType.ENTITY;
                         modelData.model = model;
-                        modelData.namespace = ForgeRegistries.ENTITY_TYPES.getKey(entityType).getNamespace();
+                        modelData.namespace = entityId.getNamespace();
 
                         // Extract texture location
                         try {
@@ -69,7 +76,11 @@ public class EntityModelScanner {
                 }
             }
 
-            ModelDumper.LOGGER.info("Found {} entity models", models.size());
+            if (models.isEmpty()) {
+                ModelDumper.LOGGER.info("No modded entity models found");
+            } else {
+                ModelDumper.LOGGER.info("Found {} modded entity models", models.size());
+            }
         } catch (Exception e) {
             ModelDumper.LOGGER.error("Error scanning entity models", e);
         }

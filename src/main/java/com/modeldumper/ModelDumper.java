@@ -1,7 +1,9 @@
 package com.modeldumper;
 
+import com.modeldumper.client.ClientEventHandler;
 import com.modeldumper.exporter.ModelExportManager;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -29,10 +31,9 @@ public class ModelDumper {
     }
 
     private void onClientSetup(final FMLClientSetupEvent event) {
-        LOGGER.info("Starting model dump on CLIENT...");
-        event.enqueueWork(() -> {
-            ModelExportManager.exportAllModels(true);
-        });
+        LOGGER.info("Model Dumper Client Setup - registering event handler");
+        // Register client event handler to trigger after world loads
+        MinecraftForge.EVENT_BUS.register(new ClientEventHandler());
     }
 
     private void onServerSetup(final FMLDedicatedServerSetupEvent event) {
