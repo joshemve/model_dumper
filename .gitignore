@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Eclipse
+*.launch
+.settings/
+.metadata
+.classpath
+.project
+bin/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VSCode
+.vscode/
+
+# Minecraft
+run/
+logs/
+crash-reports/
+
+# Model exports
+model_dumps/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
